@@ -1,0 +1,33 @@
+name: Check for New Releases
+
+on:
+  schedule:
+    - cron: '1 * * * *'  # This triggers the workflow to run every hour. Adjust as needed.
+  workflow_dispatch:  # Allows manual triggering of the workflow.
+
+jobs:
+  check_new_release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check for New Release in ActionWorkflowTesting
+      id: check_release
+      run: |
+        LATEST_RELEASE=$(curl -s https://api.github.com/repos/RemyLeBerre/ActionWorkflowTesting/releases/latest | jq -r .tag_name)
+        echo "::set-output name=latest_release::$LATEST_RELEASE"
+
+    - name: Create an Issue if New Release is Found
+      if: ${{ steps.check_release.outputs.latest_release != github.event.inputs.latest_release_tag }}
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `New Release: ${latest_release}`,
+            body: `A new release [${latest_release}](https://github.com/RemyLeBerre/ActionWorkflowTesting/releases/tag/${latest_release}) has been detected. Please review the change log and update the documentation accordingly.`
+          })
+
+    - name: Update Release Tag
+      if: ${{ steps.check_release.outputs.latest_release != github.event.inputs.latest_release_tag }}
+      run: echo "latest_release_tag=${{ steps.check_release.outputs.latest_release }}" >> $GITHUB_ENV
